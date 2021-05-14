@@ -5,6 +5,9 @@ import { TypeDefinition, TypeDefinitionStrict, Field } from '../'
 import { Kind, EnumStrict, UnionStrict } from '../types'
 import { hexPad } from './utils'
 
+const ENABLE_TYPE_REFERENCES = String(process.env.ENABLE_TYPE_REFERENCES || '').toUpperCase()
+const TYPE_REFERENCES_ENABLED = ENABLE_TYPE_REFERENCES == '1' || ENABLE_TYPE_REFERENCES == 'Y'
+
 type TypeMapping = Record<string, string>
 
 type Options = {
@@ -42,18 +45,35 @@ const getEnum = ({ name, variants }: EnumStrict) => {
   const variantsFields = variants
     .map(([key, value]) => `  ${key} = ${hexPad(value)},`)
     .join('\n')
+  const typeLoopback = TYPE_REFERENCES_ENABLED ? `
+export namespace ${name} {
+  type NameOfEnum = keyof typeof ${name}
+  export const cast = (value: number | string): ${name} => typeof value === 'string' ? getValue(value as any) : (value as ${name})
+  export const getValue = (name: NameOfEnum): ${name} => ${name}[name] as any
+  export const getName = (value: ${name}): string => ${name}[value] as any
+  export const getLabel = (value: ${name}): string => \`\$\{getName(value)\} (value)\`
+}` : ``
   return `export enum ${name} {
 ${variantsFields}
-}`
+}${typeLoopback}`
 }
 
 const getStruct = (typeDef, typeMap: TypeMapping) => {
   const members = getMembers(typeDef.fields, typeMap)
+  const exposeFields = members.map(line => {
+    let [field, type] = line.split(':')
+    let fieldName = field.trim();
+    let indent = field.substring(0, field.length - fieldName.length)
+    return `  ${indent}export const ${fieldName} = "${type.trim()}"`
+  }).join("\n")
   const membersString = members.join('\n')
-
+  const typeLoopback = TYPE_REFERENCES_ENABLED ? `
+export namespace ${typeDef.name} {
+${exposeFields}
+}` : ``;
   return `export interface ${typeDef.name} {
 ${membersString}
-}`
+}${typeLoopback}`
 }
 
 const getUnion = ({ name, members }: UnionStrict) => {

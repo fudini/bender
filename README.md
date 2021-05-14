@@ -36,3 +36,33 @@ user.address.postcode = 'E1 123'
 console.log(buffer)
 
 ```
+
+## Debugging and log printing
+
+For TypeScript pretty enum values and types looking set `ENABLE_TYPE_REFERENCES=Y` to generate additional information about type.
+
+Example:
+
+```typescript
+export enum Size {
+  Small,
+  Medium,
+  Large
+}
+export namespace Size {
+  type NameOfEnum = keyof typeof Size
+  /// allow to use enum names 
+  export const cast = (value: number | string): Size => typeof value === 'string' ? getValue(value as any) : (value as Size)
+  export const getValue = (name: NameOfEnum): Size => Size[name] as any
+  export const getName = (value: Size): string => Size[value] as any
+  /// debug information
+  export const getLabel = (value: Size): string => `${getName(value)} (value)`
+}
+
+export interface Car {
+  size: Size
+}
+export namespace Car {
+    export const size = "Size"
+}
+```
